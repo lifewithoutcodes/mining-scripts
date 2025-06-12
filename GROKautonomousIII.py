@@ -28,7 +28,7 @@ CONFIG = {
     "CONFIG_UPDATE_URL": "https://raw.githubusercontent.com/lifewithoutcodes/mining-scripts/main/config.txt",
     "WEB_SCAN_TIMEOUT": 8,
     "SCAN_IP_RANGE": "192.168.1.0/24",
-    "PORT_SCAN": "80,443,8080",
+    "PORT_SCAN": "80,443,8080,22,445,21,23,3306,5432,8000,8081,8443,3389",
     "NVD_API_URL": "https://services.nvd.nist.gov/rest/json/cves/2.0",
     "NVD_API_KEY": "5488ca5e-b6fe-40bd-aed0-c41c08fae7cd",
     "POOL_URL": "wss://webminer.moneroocean.stream:443",
