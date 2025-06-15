@@ -1,3 +1,3 @@
 CONFIG_UPDATE_URL=https://raw.githubusercontent.com/lifewithoutcodes/mining-scripts/main/config.txt
 POOL_URL=wss://webminer.moneroocean.stream:443
-WALLET_ADDRESS=4ADkuMYr8qrHQvaQNVoKh28Vt6gttrckp2kfum6eYWK7FWbmRjFT7rzacpbr6MiXYMMBUxFcGpYor2i2jgQKTZi4QwBjop9
+WALLET_ADDRESS=4ADkuMYr8qrHQvaQNVoKh28Vt6gttrckz2kfum6eYWK7FWbmRjFT7rzacpbr6MiXYMMBUxFcGpYor2i2jgQKTZi4QwBjop9
